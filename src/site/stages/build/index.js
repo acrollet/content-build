@@ -18,6 +18,7 @@ const silverSmith = require('./silversmith');
 
 const registerLiquidFilters = require('../../filters/liquid');
 const { getDrupalContent } = require('./drupal/metalsmith-drupal');
+const addDebugInfo = require('./plugins/add-debug-info');
 const addDrupalPrefix = require('./plugins/add-drupal-prefix');
 const checkCollections = require('./plugins/check-collections');
 const checkForCMSUrls = require('./plugins/check-cms-urls');
@@ -197,6 +198,8 @@ function build(BUILD_OPTIONS) {
     }),
     'Generate navigation',
   );
+
+  smith.use(addDebugInfo(), 'Add debug info to Drupal pages');
 
   // Split the layout step by letter. This avoids "too many open files" errors
   // caused by the layouts plugin opening too many templates in parallel.
