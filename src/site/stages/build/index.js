@@ -18,6 +18,7 @@ const silverSmith = require('./silversmith');
 
 const registerLiquidFilters = require('../../filters/liquid');
 const { getDrupalContent } = require('./drupal/metalsmith-drupal');
+const addDebugInfo = require('./plugins/add-debug-info');
 const addDrupalPrefix = require('./plugins/add-drupal-prefix');
 const checkCollections = require('./plugins/check-collections');
 const checkForCMSUrls = require('./plugins/check-cms-urls');
@@ -248,6 +249,8 @@ function build(BUILD_OPTIONS) {
   // We no longer need to build them now that they are stored directly on disk
   smith.use(ignoreAssets(), 'Ignore assets for build');
 
+  smith.use(addDebugInfo(), 'Save reference to Metalsmith file object');
+
   smith.build(err => {
     if (err) {
       smith.endGarbageCollection();
@@ -278,6 +281,25 @@ function build(BUILD_OPTIONS) {
         smith.printSummary();
         smith.printPeakMemory();
       }
+
+      // Add debug info from 'addDebugInfo' plugin to HTML files
+      console.log('Adding debug info to Drupal pages...');
+
+      Object.keys(smith.metalsmithFiles).forEach(fileName => {
+        const filePath = `build/${BUILD_OPTIONS.buildtype}/${fileName}`;
+        const page = fs.readFileSync(filePath, { encoding: 'utf8' });
+
+        fs.writeFileSync(
+          filePath,
+          page.replace(
+            /window.contentData = (.*);/,
+            `window.contentData = ${JSON.stringify(
+              smith.metalsmithFiles[fileName],
+            )};`,
+          ),
+          'utf8',
+        );
+      });
 
       smith.endGarbageCollection();
 
