@@ -18,6 +18,7 @@ const silverSmith = require('./silversmith');
 
 const registerLiquidFilters = require('../../filters/liquid');
 const { getDrupalContent } = require('./drupal/metalsmith-drupal');
+const removeDebugInfo = require('./plugins/remove-debug-info');
 const addDrupalPrefix = require('./plugins/add-drupal-prefix');
 const checkCollections = require('./plugins/check-collections');
 const checkForCMSUrls = require('./plugins/check-cms-urls');
@@ -222,6 +223,7 @@ function build(BUILD_OPTIONS) {
       `Apply layouts ${pattern.length === 2 ? pattern[0] : pattern}`,
     );
   });
+  smith.use(removeDebugInfo(), 'Remove Debug info');
 
   /*
    * This will replace links in static pages with a staging domain,
