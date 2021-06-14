@@ -88,7 +88,15 @@ function addDebugInfo(files, buildtype) {
     .filter(fileName => files[fileName].isDrupalPage)
     .forEach(fileName => {
       const filePath = `build/${buildtype}/${fileName}`;
-      const page = fs.readFileSync(filePath, { encoding: 'utf8' });
+      const readStream = fs.createReadStream(filePath, {
+        encoding: 'utf8',
+        autoClose: true,
+      });
+      fs.outputFileSync(`tmp/${fileName}`, '');
+      const outputStream = fs.createWriteStream(`tmp/${fileName}`, {
+        encoding: 'utf8',
+        autoClose: true,
+      });
 
       const debugInfo = Object.fromEntries(
         Object.entries(files[fileName]).filter(
@@ -96,14 +104,36 @@ function addDebugInfo(files, buildtype) {
         ),
       );
 
-      fs.writeFileSync(
-        filePath,
-        page.replace(
-          /window.contentData = (.*);/,
-          `window.contentData = ${JSON.stringify(debugInfo)};`,
-        ),
-        'utf8',
-      );
+      readStream.on('data', data => {
+        outputStream.write(
+          data
+            .toString()
+            .replace(
+              /window.contentData = (.*);/,
+              `window.contentData = ${JSON.stringify(debugInfo)};`,
+            ),
+        );
+      });
+
+      readStream.on('end', () => {
+        outputStream.end(); // emits 'finish' event, executes below statement
+      });
+
+      outputStream.on('finish', () => {
+        fs.renameSync(`tmp/${fileName}`, filePath);
+      });
+
+      // fs.renameSync(`/tmp/index.html`, filePath);
+      // readStream.end();
+      // outputStream.end();
+      // .pipe('data', data => {
+      //   data
+      //     .toString()
+      //     .replace(
+      //       /window.contentData = (.*);/,
+      //       `window.contentData = ${JSON.stringify(debugInfo)};`,
+      //     );
+      // })
     });
 }
 
@@ -321,7 +351,7 @@ function build(BUILD_OPTIONS) {
       }
 
       if (BUILD_OPTIONS.buildtype !== 'vagovprod' && !BUILD_OPTIONS.omitdebug) {
-        // Add debug info from 'addDebugInfo' plugin to HTML files
+        // Add debug info to HTML files
         addDebugInfo(files, BUILD_OPTIONS.buildtype);
       }
 
