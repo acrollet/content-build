@@ -66,7 +66,7 @@ function restorePagesJSON() {
   }
 }
 
-function addDebugInfo(files, buildtype) {
+async function addDebugInfo(files, buildtype) {
   console.log('Adding debug info to Drupal pages...');
 
   const keysToIgnore = [
@@ -86,41 +86,45 @@ function addDebugInfo(files, buildtype) {
 
   Object.keys(files)
     .filter(fileName => files[fileName].isDrupalPage)
-    .forEach(fileName => {
+    .forEach(async fileName => {
       const filePath = `build/${buildtype}/${fileName}`;
       const readStream = fs.createReadStream(filePath, {
         encoding: 'utf8',
         autoClose: true,
       });
+
       fs.outputFileSync(`tmp/${fileName}`, '');
       const outputStream = fs.createWriteStream(`tmp/${fileName}`, {
         encoding: 'utf8',
         autoClose: true,
       });
 
-      const debugInfo = Object.fromEntries(
-        Object.entries(files[fileName]).filter(
-          key => !keysToIgnore.includes(key[0]),
-        ),
-      );
-
-      readStream.on('data', data => {
-        outputStream.write(
-          data
-            .toString()
-            .replace(
-              /window.contentData = (.*);/,
-              `window.contentData = ${JSON.stringify(debugInfo)};`,
-            ),
+      await new Promise(resolve => {
+        const debugInfo = Object.fromEntries(
+          Object.entries(files[fileName]).filter(
+            key => !keysToIgnore.includes(key[0]),
+          ),
         );
-      });
 
-      readStream.on('end', () => {
-        outputStream.end(); // emits 'finish' event, executes below statement
-      });
+        readStream.on('data', data => {
+          outputStream.write(
+            data
+              .toString()
+              .replace(
+                /window.contentData = (.*);/,
+                `window.contentData = ${JSON.stringify(debugInfo)};`,
+              ),
+          );
+        });
 
-      outputStream.on('finish', () => {
-        fs.renameSync(`tmp/${fileName}`, filePath);
+        readStream.on('end', () => {
+          outputStream.end(); // emits 'finish' event, executes below statement
+        });
+
+        outputStream.on('finish', () => {
+          fs.renameSync(`tmp/${fileName}`, filePath);
+          resolve();
+        });
       });
 
       // fs.renameSync(`/tmp/index.html`, filePath);
