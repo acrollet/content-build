@@ -7,6 +7,8 @@ function removeDebugInfo() {
       .forEach(([fileName]) => {
         delete files[fileName].debug;
       });
+
+    global.gc();
     done();
   };
 }
