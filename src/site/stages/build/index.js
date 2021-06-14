@@ -18,7 +18,6 @@ const silverSmith = require('./silversmith');
 
 const registerLiquidFilters = require('../../filters/liquid');
 const { getDrupalContent } = require('./drupal/metalsmith-drupal');
-const addDebugInfo = require('./plugins/add-debug-info');
 const addDrupalPrefix = require('./plugins/add-drupal-prefix');
 const checkCollections = require('./plugins/check-collections');
 const checkForCMSUrls = require('./plugins/check-cms-urls');
@@ -67,6 +66,47 @@ function restorePagesJSON() {
   }
 }
 
+function addDebugInfo(files, buildtype) {
+  console.log('Adding debug info to Drupal pages...');
+
+  const keysToIgnore = [
+    'breadcrumb_path',
+    'collection',
+    'contents',
+    'debug',
+    'filename',
+    'isDrupalPage',
+    'layout',
+    'modified',
+    'nav_children',
+    'nav_path',
+    'path',
+    'private',
+  ];
+
+  Object.keys(files)
+    .filter(fileName => files[fileName].isDrupalPage)
+    .forEach(fileName => {
+      const filePath = `build/${buildtype}/${fileName}`;
+      const page = fs.readFileSync(filePath, { encoding: 'utf8' });
+
+      const debugInfo = Object.fromEntries(
+        Object.entries(files[fileName]).filter(
+          key => !keysToIgnore.includes(key[0]),
+        ),
+      );
+
+      fs.writeFileSync(
+        filePath,
+        page.replace(
+          /window.contentData = (.*);/,
+          `window.contentData = ${JSON.stringify(debugInfo)};`,
+        ),
+        'utf8',
+      );
+    });
+}
+
 function build(BUILD_OPTIONS) {
   const usingCMSExport = BUILD_OPTIONS['use-cms-export'];
   if (usingCMSExport) {
@@ -74,7 +114,7 @@ function build(BUILD_OPTIONS) {
   }
 
   const smith = silverSmith();
-
+  console.log(smith);
   registerLiquidFilters();
 
   // Start manual garbage collection to limit large spikes in memory use.
@@ -249,11 +289,7 @@ function build(BUILD_OPTIONS) {
   // We no longer need to build them now that they are stored directly on disk
   smith.use(ignoreAssets(), 'Ignore assets for build');
 
-  if (BUILD_OPTIONS.buildtype !== 'vagovprod' && !BUILD_OPTIONS.omitdebug) {
-    smith.use(addDebugInfo(), 'Save reference to Metalsmith file object');
-  }
-
-  smith.build(err => {
+  smith.build((err, files) => {
     if (err) {
       smith.endGarbageCollection();
       throw err;
@@ -286,23 +322,7 @@ function build(BUILD_OPTIONS) {
 
       if (BUILD_OPTIONS.buildtype !== 'vagovprod' && !BUILD_OPTIONS.omitdebug) {
         // Add debug info from 'addDebugInfo' plugin to HTML files
-        console.log('Adding debug info to Drupal pages...');
-
-        Object.keys(smith.metalsmithFiles).forEach(fileName => {
-          const filePath = `build/${BUILD_OPTIONS.buildtype}/${fileName}`;
-          const page = fs.readFileSync(filePath, { encoding: 'utf8' });
-
-          fs.writeFileSync(
-            filePath,
-            page.replace(
-              /window.contentData = (.*);/,
-              `window.contentData = ${JSON.stringify(
-                smith.metalsmithFiles[fileName],
-              )};`,
-            ),
-            'utf8',
-          );
-        });
+        addDebugInfo(files, BUILD_OPTIONS.buildtype);
       }
 
       smith.endGarbageCollection();
