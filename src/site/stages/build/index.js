@@ -88,13 +88,15 @@ async function addDebugInfo(files, buildtype) {
     .filter(fileName => files[fileName].isDrupalPage)
     .forEach(async fileName => {
       const filePath = `build/${buildtype}/${fileName}`;
+      const tmpFilepath = `tmp/${filePath}`;
       const readStream = fs.createReadStream(filePath, {
         encoding: 'utf8',
         autoClose: true,
       });
 
-      fs.outputFileSync(`tmp/${fileName}`, '');
-      const outputStream = fs.createWriteStream(`tmp/${fileName}`, {
+      fs.ensureFileSync(tmpFilepath);
+
+      const outputStream = fs.createWriteStream(tmpFilepath, {
         encoding: 'utf8',
         autoClose: true,
       });
@@ -118,26 +120,14 @@ async function addDebugInfo(files, buildtype) {
         });
 
         readStream.on('end', () => {
-          outputStream.end(); // emits 'finish' event, executes below statement
+          outputStream.end();
         });
 
         outputStream.on('finish', () => {
-          fs.renameSync(`tmp/${fileName}`, filePath);
+          fs.renameSync(tmpFilepath, filePath);
           resolve();
         });
       });
-
-      // fs.renameSync(`/tmp/index.html`, filePath);
-      // readStream.end();
-      // outputStream.end();
-      // .pipe('data', data => {
-      //   data
-      //     .toString()
-      //     .replace(
-      //       /window.contentData = (.*);/,
-      //       `window.contentData = ${JSON.stringify(debugInfo)};`,
-      //     );
-      // })
     });
 }
 
