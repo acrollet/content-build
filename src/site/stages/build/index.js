@@ -89,6 +89,7 @@ async function addDebugInfo(files, buildtype) {
     .forEach(async fileName => {
       const filePath = `build/${buildtype}/${fileName}`;
       const tmpFilepath = `tmp/${filePath}`;
+
       const readStream = fs.createReadStream(filePath, {
         encoding: 'utf8',
         autoClose: true,
@@ -124,7 +125,8 @@ async function addDebugInfo(files, buildtype) {
         });
 
         outputStream.on('finish', () => {
-          fs.renameSync(tmpFilepath, filePath);
+          fs.moveSync(tmpFilepath, filePath, { overwrite: true });
+          fs.removeSync(tmpFilepath);
           resolve();
         });
       });
