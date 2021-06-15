@@ -84,53 +84,55 @@ async function addDebugInfo(files, buildtype) {
     'private',
   ];
 
-  Object.keys(files)
-    .filter(fileName => files[fileName].isDrupalPage)
-    .forEach(async fileName => {
-      const filePath = `build/${buildtype}/${fileName}`;
-      const tmpFilepath = `tmp/${filePath}`;
+  const drupalFiles = Object.keys(files).filter(
+    fileName => files[fileName].isDrupalPage,
+  );
 
-      const readStream = fs.createReadStream(filePath, {
-        encoding: 'utf8',
-        autoClose: true,
-      });
+  for (const fileName of drupalFiles) {
+    const filePath = `build/${buildtype}/${fileName}`;
+    const tmpFilepath = `tmp/${filePath}`;
 
-      fs.ensureFileSync(tmpFilepath);
+    const readStream = fs.createReadStream(filePath, {
+      encoding: 'utf8',
+      autoClose: true,
+    });
 
-      const outputStream = fs.createWriteStream(tmpFilepath, {
-        encoding: 'utf8',
-        autoClose: true,
-      });
+    fs.ensureFileSync(tmpFilepath);
 
-      await new Promise(resolve => {
-        const debugInfo = Object.fromEntries(
-          Object.entries(files[fileName]).filter(
-            key => !keysToIgnore.includes(key[0]),
-          ),
+    const outputStream = fs.createWriteStream(tmpFilepath, {
+      encoding: 'utf8',
+      autoClose: true,
+    });
+
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise(resolve => {
+      const debugInfo = Object.fromEntries(
+        Object.entries(files[fileName]).filter(
+          key => !keysToIgnore.includes(key[0]),
+        ),
+      );
+
+      readStream.on('data', data => {
+        outputStream.write(
+          data
+            .toString()
+            .replace(
+              /window.contentData = (.*);/,
+              `window.contentData = ${JSON.stringify(debugInfo)};`,
+            ),
         );
+      });
 
-        readStream.on('data', data => {
-          outputStream.write(
-            data
-              .toString()
-              .replace(
-                /window.contentData = (.*);/,
-                `window.contentData = ${JSON.stringify(debugInfo)};`,
-              ),
-          );
-        });
+      readStream.on('end', () => {
+        outputStream.end();
+      });
 
-        readStream.on('end', () => {
-          outputStream.end();
-        });
-
-        outputStream.on('finish', () => {
-          fs.moveSync(tmpFilepath, filePath, { overwrite: true });
-          fs.removeSync(tmpFilepath);
-          resolve();
-        });
+      outputStream.on('finish', () => {
+        fs.moveSync(tmpFilepath, filePath, { overwrite: true });
+        resolve();
       });
     });
+  }
 }
 
 function build(BUILD_OPTIONS) {
@@ -140,7 +142,7 @@ function build(BUILD_OPTIONS) {
   }
 
   const smith = silverSmith();
-  console.log(smith);
+
   registerLiquidFilters();
 
   // Start manual garbage collection to limit large spikes in memory use.
