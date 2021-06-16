@@ -102,7 +102,6 @@ function addDebugInfo(files, buildtype) {
       if (!fs.existsSync(path.dirname(tmpFilepath))) {
         fs.mkdirSync(path.dirname(tmpFilepath), { recursive: true });
       }
-      fs.writeFileSync(tmpFilepath, '');
 
       const outputStream = fs.createWriteStream(tmpFilepath, {
         encoding: 'utf8',
