@@ -1,6 +1,8 @@
 // Builds the site using Metalsmith as the top-level build runner.
 /* eslint-disable no-console */
-const fs = require('fs-extra');
+const fs = require('graceful-fs');
+const fsExtra = require('fs-extra');
+const path = require('path');
 const chalk = require('chalk');
 const assets = require('metalsmith-assets');
 const collections = require('metalsmith-collections');
@@ -96,7 +98,11 @@ function addDebugInfo(files, buildtype) {
         autoClose: true,
       });
 
-      fs.ensureFileSync(tmpFilepath);
+      // fs.ensureFileSync(tmpFilepath);
+      if (!fs.existsSync(path.dirname(tmpFilepath))) {
+        fs.mkdirSync(path.dirname(tmpFilepath));
+      }
+      fs.writeFileSync(tmpFilepath, '');
 
       const outputStream = fs.createWriteStream(tmpFilepath, {
         encoding: 'utf8',
@@ -125,7 +131,7 @@ function addDebugInfo(files, buildtype) {
       });
 
       outputStream.on('finish', () => {
-        fs.moveSync(tmpFilepath, filePath, { overwrite: true });
+        fsExtra.moveSync(tmpFilepath, filePath, { overwrite: true });
         // console.log('Done adding debug info to: ', fileName);
       });
     });
