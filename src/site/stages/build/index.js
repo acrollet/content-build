@@ -1,7 +1,6 @@
 // Builds the site using Metalsmith as the top-level build runner.
 /* eslint-disable no-console */
 const fs = require('graceful-fs');
-const fsExtra = require('fs-extra');
 const path = require('path');
 const chalk = require('chalk');
 const assets = require('metalsmith-assets');
@@ -69,70 +68,80 @@ function restorePagesJSON() {
 }
 
 function addDebugInfo(files, buildtype) {
-  console.log('Adding debug info to Drupal pages...');
+  try {
+    console.log('Adding debug info to Drupal pages...');
 
-  const keysToIgnore = [
-    'breadcrumb_path',
-    'collection',
-    'contents',
-    'debug',
-    'filename',
-    'isDrupalPage',
-    'layout',
-    'modified',
-    'nav_children',
-    'nav_path',
-    'path',
-    'private',
-  ];
+    const keysToIgnore = [
+      'breadcrumb_path',
+      'collection',
+      'contents',
+      'filename',
+      'isDrupalPage',
+      'layout',
+      'modified',
+      'nav_children',
+      'nav_path',
+      'path',
+      'private',
+    ];
 
-  Object.keys(files)
-    .filter(fileName => files[fileName].isDrupalPage)
-    .forEach(fileName => {
-      // console.log('Adding debug info to: ', fileName);
-      const filePath = `build/${buildtype}/${fileName}`;
-      const tmpFilepath = `tmp/${filePath}`;
+    Object.keys(files)
+      .filter(fileName => files[fileName].isDrupalPage)
+      .forEach(fileName => {
+        const filePath = `build/${buildtype}/${fileName}`;
+        const tmpFilepath = `tmp/${filePath}`;
+        const tmpFileDir = path.dirname(tmpFilepath);
 
-      if (!fs.existsSync(path.dirname(tmpFilepath))) {
-        fs.mkdirSync(path.dirname(tmpFilepath), { recursive: true });
-      }
+        if (!fs.existsSync(tmpFileDir)) {
+          fs.mkdirSync(tmpFileDir, { recursive: true });
+        }
 
-      const readStream = fs.createReadStream(filePath, {
-        encoding: 'utf8',
-        autoClose: true,
-      });
+        const readStream = fs.createReadStream(filePath, {
+          encoding: 'utf8',
+          autoClose: true,
+        });
 
-      const outputStream = fs.createWriteStream(tmpFilepath, {
-        encoding: 'utf8',
-        autoClose: true,
-      });
+        const outputStream = fs.createWriteStream(tmpFilepath, {
+          encoding: 'utf8',
+          autoClose: true,
+        });
 
-      const debugInfo = Object.fromEntries(
-        Object.entries(files[fileName]).filter(
-          key => !keysToIgnore.includes(key[0]),
-        ),
-      );
-
-      readStream.on('data', data => {
-        outputStream.write(
-          data
-            .toString()
-            .replace(
-              'window.contentData = null;',
-              `window.contentData = ${JSON.stringify(debugInfo)};`,
-            ),
+        const debugInfo = Object.fromEntries(
+          Object.entries(files[fileName]).filter(
+            key => !keysToIgnore.includes(key[0]),
+          ),
         );
-      });
 
-      readStream.on('end', () => {
-        outputStream.end();
-      });
+        // `window.contentData = null` is added to Drupal pages from the debug.drupal.liquid template
+        // when the `debug` key doesn't exist in the Metalsmith file entry.
+        // We want to replace all instances of that with the debug object.
+        readStream.on('data', data => {
+          outputStream.write(
+            data
+              .toString()
+              .replace(
+                'window.contentData = null;',
+                `window.contentData = ${JSON.stringify(debugInfo)};`,
+              ),
+          );
+        });
 
-      outputStream.on('finish', () => {
-        fsExtra.moveSync(tmpFilepath, filePath, { overwrite: true });
-        // console.log('Done adding debug info to: ', fileName);
+        readStream.on('end', () => {
+          outputStream.end();
+        });
+
+        outputStream.on('finish', () => {
+          // Overwrite original file with new file
+          fs.copyFileSync(tmpFilepath, filePath);
+        });
       });
-    });
+  } catch (error) {
+    console.error('Error adding debug info to files.\n', error);
+  }
+  // finally {
+  //   // Remove leftover empty directories in /tmp
+  //   fs.rmdirSync(`tmp/build/${buildtype}`, { recursive: true });
+  // }
 }
 
 function build(BUILD_OPTIONS) {
