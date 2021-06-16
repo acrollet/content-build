@@ -1,7 +1,6 @@
 // Builds the site using Metalsmith as the top-level build runner.
 /* eslint-disable no-console */
 const fs = require('fs-extra');
-const gracefulFs = require('graceful-fs');
 const chalk = require('chalk');
 const assets = require('metalsmith-assets');
 const collections = require('metalsmith-collections');
@@ -42,7 +41,6 @@ const updateRobots = require('./plugins/update-robots');
 
 const pagesJSONPath = '.cache/localhost/drupal/pages.json';
 const backupPath = '/tmp/pages.json';
-gracefulFs.gracefulify(fs);
 
 function backupPagesJSON() {
   try {
