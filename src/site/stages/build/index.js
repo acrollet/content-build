@@ -1,6 +1,7 @@
 // Builds the site using Metalsmith as the top-level build runner.
 /* eslint-disable no-console */
 const fs = require('fs-extra');
+const gracefulFs = require('graceful-fs');
 const chalk = require('chalk');
 const assets = require('metalsmith-assets');
 const collections = require('metalsmith-collections');
@@ -41,6 +42,7 @@ const updateRobots = require('./plugins/update-robots');
 
 const pagesJSONPath = '.cache/localhost/drupal/pages.json';
 const backupPath = '/tmp/pages.json';
+gracefulFs.gracefulify(fs);
 
 function backupPagesJSON() {
   try {
@@ -66,7 +68,7 @@ function restorePagesJSON() {
   }
 }
 
-async function addDebugInfo(files, buildtype) {
+function addDebugInfo(files, buildtype) {
   console.log('Adding debug info to Drupal pages...');
 
   const keysToIgnore = [
@@ -84,28 +86,25 @@ async function addDebugInfo(files, buildtype) {
     'private',
   ];
 
-  const drupalFiles = Object.keys(files).filter(
-    fileName => files[fileName].isDrupalPage,
-  );
+  Object.keys(files)
+    .filter(fileName => files[fileName].isDrupalPage)
+    .forEach(fileName => {
+      // console.log('Adding debug info to: ', fileName);
+      const filePath = `build/${buildtype}/${fileName}`;
+      const tmpFilepath = `tmp/${filePath}`;
 
-  for (const fileName of drupalFiles) {
-    const filePath = `build/${buildtype}/${fileName}`;
-    const tmpFilepath = `tmp/${filePath}`;
+      const readStream = fs.createReadStream(filePath, {
+        encoding: 'utf8',
+        autoClose: true,
+      });
 
-    const readStream = fs.createReadStream(filePath, {
-      encoding: 'utf8',
-      autoClose: true,
-    });
+      fs.ensureFileSync(tmpFilepath);
 
-    fs.ensureFileSync(tmpFilepath);
+      const outputStream = fs.createWriteStream(tmpFilepath, {
+        encoding: 'utf8',
+        autoClose: true,
+      });
 
-    const outputStream = fs.createWriteStream(tmpFilepath, {
-      encoding: 'utf8',
-      autoClose: true,
-    });
-
-    // eslint-disable-next-line no-await-in-loop
-    await new Promise(resolve => {
       const debugInfo = Object.fromEntries(
         Object.entries(files[fileName]).filter(
           key => !keysToIgnore.includes(key[0]),
@@ -129,10 +128,9 @@ async function addDebugInfo(files, buildtype) {
 
       outputStream.on('finish', () => {
         fs.moveSync(tmpFilepath, filePath, { overwrite: true });
-        resolve();
+        // console.log('Done adding debug info to: ', fileName);
       });
     });
-  }
 }
 
 function build(BUILD_OPTIONS) {
