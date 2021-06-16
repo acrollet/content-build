@@ -19,7 +19,6 @@ function createFileObj(page, layout) {
     isDrupalPage: true,
     layout,
     contents: Buffer.from('<!-- Drupal-provided data -->'),
-    debug: {},
     private: privStatus,
   };
 }
@@ -245,22 +244,29 @@ function getFacilitySidebar(page, contentData) {
       return contentData.data[facilitySidebarNavName];
     } else {
       const errorMessage = `Failed to find a facility sidebar with a name that matches the VAMC office label "${facilityNavName}".`;
+
       console.log(chalk.red(errorMessage));
+
       console.log(
         chalk.red(
           'The VAMC office label should match one of the following menu names as returned by the CMS -',
         ),
       );
+
       const sidebarNames = Object.values(contentData.data)
         .filter(queryData => queryData?.name)
         .map(queryData => `- ${queryData.name}`);
+
       console.log(chalk.red(sidebarNames.join('\n')));
+
       const stringifiedPage = JSON.stringify(page, null, 2);
+
       console.log(
         chalk.red(
           `Here is the entity evaluated when this error was triggered: \n${stringifiedPage}`,
         ),
       );
+
       throw new Error(errorMessage);
     }
   }

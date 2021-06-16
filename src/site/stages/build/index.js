@@ -69,11 +69,11 @@ function restorePagesJSON() {
 async function addDebugInfo(files, buildtype) {
   console.log('Adding debug info to Drupal pages...');
 
+  // Extra keys in Metalsmith file entries that we don't need in the debug info
   const keysToIgnore = [
     'breadcrumb_path',
     'collection',
     'contents',
-    'debug',
     'filename',
     'isDrupalPage',
     'layout',
@@ -112,12 +112,15 @@ async function addDebugInfo(files, buildtype) {
         ),
       );
 
+      // `window.contentData = null` is added to Drupal pages from the debug.drupal.liquid template
+      // when the `debug` key doesn't exist in the Metalsmith file entry.
+      // We want to replace all instances of that with the debug info.
       readStream.on('data', data => {
         outputStream.write(
           data
             .toString()
             .replace(
-              /window.contentData = (.*);/,
+              'window.contentData = null;',
               `window.contentData = ${JSON.stringify(debugInfo)};`,
             ),
         );
@@ -133,6 +136,9 @@ async function addDebugInfo(files, buildtype) {
       });
     });
   }
+
+  // Remove leftover empty directories in /tmp
+  fs.rmdirSync(`tmp/build/${buildtype}`, { recursive: true });
 }
 
 function build(BUILD_OPTIONS) {
@@ -348,14 +354,14 @@ function build(BUILD_OPTIONS) {
         smith.printPeakMemory();
       }
 
+      smith.endGarbageCollection();
+
+      console.log('The Metalsmith build has completed.');
+
       if (BUILD_OPTIONS.buildtype !== 'vagovprod' && !BUILD_OPTIONS.omitdebug) {
         // Add debug info to HTML files
         addDebugInfo(files, BUILD_OPTIONS.buildtype);
       }
-
-      smith.endGarbageCollection();
-
-      console.log('The Metalsmith build has completed.');
 
       if (usingCMSExport) {
         restorePagesJSON();
