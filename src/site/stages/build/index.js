@@ -93,15 +93,14 @@ function addDebugInfo(files, buildtype) {
       const filePath = `build/${buildtype}/${fileName}`;
       const tmpFilepath = `tmp/${filePath}`;
 
+      if (!fs.existsSync(path.dirname(tmpFilepath))) {
+        fs.mkdirSync(path.dirname(tmpFilepath), { recursive: true });
+      }
+
       const readStream = fs.createReadStream(filePath, {
         encoding: 'utf8',
         autoClose: true,
       });
-
-      // fs.ensureFileSync(tmpFilepath);
-      if (!fs.existsSync(path.dirname(tmpFilepath))) {
-        fs.mkdirSync(path.dirname(tmpFilepath), { recursive: true });
-      }
 
       const outputStream = fs.createWriteStream(tmpFilepath, {
         encoding: 'utf8',
@@ -119,7 +118,7 @@ function addDebugInfo(files, buildtype) {
           data
             .toString()
             .replace(
-              /window.contentData = (.*);/,
+              'window.contentData = null;',
               `window.contentData = ${JSON.stringify(debugInfo)};`,
             ),
         );
@@ -349,14 +348,14 @@ function build(BUILD_OPTIONS) {
         smith.printPeakMemory();
       }
 
+      smith.endGarbageCollection();
+
+      console.log('The Metalsmith build has completed.');
+
       if (BUILD_OPTIONS.buildtype !== 'vagovprod' && !BUILD_OPTIONS.omitdebug) {
         // Add debug info to HTML files
         addDebugInfo(files, BUILD_OPTIONS.buildtype);
       }
-
-      smith.endGarbageCollection();
-
-      console.log('The Metalsmith build has completed.');
 
       if (usingCMSExport) {
         restorePagesJSON();
