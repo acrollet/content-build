@@ -100,7 +100,7 @@ function addDebugInfo(files, buildtype) {
 
       // fs.ensureFileSync(tmpFilepath);
       if (!fs.existsSync(path.dirname(tmpFilepath))) {
-        fs.mkdirSync(path.dirname(tmpFilepath));
+        fs.mkdirSync(path.dirname(tmpFilepath), { recursive: true });
       }
       fs.writeFileSync(tmpFilepath, '');
 
