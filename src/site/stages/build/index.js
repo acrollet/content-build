@@ -138,10 +138,6 @@ function addDebugInfo(files, buildtype) {
   } catch (error) {
     console.error('Error adding debug info to files.\n', error);
   }
-  // finally {
-  //   // Remove leftover empty directories in /tmp
-  //   fs.rmdirSync(`tmp/build/${buildtype}`, { recursive: true });
-  // }
 }
 
 function build(BUILD_OPTIONS) {
