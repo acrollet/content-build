@@ -1,6 +1,6 @@
 // Builds the site using Metalsmith as the top-level build runner.
 /* eslint-disable no-console */
-const fs = require('graceful-fs');
+const fs = require('fs-extra');
 const path = require('path');
 const chalk = require('chalk');
 const assets = require('metalsmith-assets');
@@ -132,7 +132,7 @@ function addDebugInfo(files, buildtype) {
 
         outputStream.on('finish', () => {
           // Overwrite original file with new file
-          fs.copyFileSync(tmpFilepath, filePath);
+          fs.moveSync(tmpFilepath, filePath, { overwrite: true });
         });
       });
   } catch (error) {
