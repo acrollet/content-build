@@ -69,7 +69,7 @@ function restorePagesJSON() {
 
 function addDebugInfo(files, buildtype) {
   try {
-    console.log('Adding debug info to Drupal pages...');
+    console.log('\nAdding debug info to Drupal pages...\n');
 
     const keysToIgnore = [
       'breadcrumb_path',
@@ -136,7 +136,7 @@ function addDebugInfo(files, buildtype) {
         });
       });
   } catch (error) {
-    console.error('Error adding debug info to files.\n', error);
+    console.error('\nError adding debug info to files.\n', error);
   }
 }
 
@@ -357,14 +357,14 @@ function build(BUILD_OPTIONS) {
 
       console.log('The Metalsmith build has completed.');
 
-      if (BUILD_OPTIONS.buildtype !== 'vagovprod' && !BUILD_OPTIONS.omitdebug) {
-        // Add debug info to HTML files
-        addDebugInfo(files, BUILD_OPTIONS.buildtype);
-      }
-
       if (usingCMSExport) {
         restorePagesJSON();
       }
+    }
+
+    if (BUILD_OPTIONS.buildtype !== 'vagovprod' && !BUILD_OPTIONS.omitdebug) {
+      // Add debug info to HTML files
+      addDebugInfo(files, BUILD_OPTIONS.buildtype);
     }
   }); // smith.build()
 }
