@@ -1150,5 +1150,14 @@
       "vagovprod": false,
       "layout": "page-react.html"
     }
+  },
+  {
+    "appName": "FE Tools Testing",
+    "entryName": "fe-tools-testing",
+    "rootUrl": "/fe-tools-testing",
+    "template": {
+      "vagovprod": false,
+      "layout": "page-react.html"
+    }
   }
 ]
