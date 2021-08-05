@@ -1,7 +1,11 @@
 const fs = require('fs-extra');
 const path = require('path');
 
-module.exports = on => {
+const {
+  addMatchImageSnapshotPlugin,
+} = require('cypress-image-snapshot/plugin');
+
+module.exports = (on, config) => {
   on('task', {
     /* eslint-disable no-console */
     log: message => console.log(message) || null,
@@ -69,4 +73,6 @@ module.exports = on => {
       return dir;
     },
   });
+
+  addMatchImageSnapshotPlugin(on, config);
 };
