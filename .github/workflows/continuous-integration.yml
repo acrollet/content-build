@@ -6,6 +6,12 @@ on:
       - '**'
     tags-ignore:
       - '**'
+  workflow_dispatch:
+    inputs:
+      release_wait:
+        description: "Minutes to wait before creating release"
+        required: false
+        default: 5
 
 # TODO: Change to correct channel_id when ready
 env:
@@ -91,6 +97,39 @@ jobs:
       - name: EC2 Runner ID
         id: start-ec2-runner-id
         run: echo ::set-output name=${{ matrix.buildtype }}::${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
+  set-env:
+    name: Set Env Variables
+    runs-on: ubuntu-latest
+    outputs:
+      LATEST_TAG_VERSION: ${{ steps.get-latest-tag.outputs.LATEST_TAG_VERSION }}
+      RELEASE_WAIT: ${{ env.RELEASE_WAIT }}
+      REF: ${{ steps.get-latest-release.outputs.target_commitish }}
+
+    steps:
+      - name: Cancel workflow due to DSVA schedule
+        if: ${{ env.DSVA_SCHEDULE_ENABLED != 'true' }}
+        uses: andymckay/cancel-action@0.2
+
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Get latest tag
+        id: get-latest-tag
+        run: echo ::set-output name=LATEST_TAG_VERSION::$(git fetch --all --tags > /dev/null && git tag -l | sort -V --reverse | head -n 1)
+
+      - name: Get latest release
+        id: get-latest-release
+        uses: thebritican/fetch-latest-release@v2.0.0
+
+      - name: Get release wait time (scheduled release)
+        if: ${{ github.event.schedule != '' }}
+        run: echo "RELEASE_WAIT=0" >> $GITHUB_ENV
+
+      - name: Get release wait time (workflow_dispatch)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: echo "RELEASE_WAIT=${{ github.event.inputs.release_wait }}" >> $GITHUB_ENV
 
   build:
     name: Build
