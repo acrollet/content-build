@@ -5,12 +5,12 @@ DRUPAL_MAPPING = [
 ]
 
 DRUPAL_ADDRESSES = [
-  'vagovdev'    : 'http://internal-dsva-vagov-dev-cms-812329399.us-gov-west-1.elb.amazonaws.com',
-  'vagovstaging': 'http://internal-dsva-vagov-staging-cms-1188006.us-gov-west-1.elb.amazonaws.com',
-  'vagovprod'   : 'http://internal-dsva-vagov-prod-cms-2000800896.us-gov-west-1.elb.amazonaws.com',
+  'vagovdev'    : 'https://test.staging.cms.va.gov',
+  'vagovstaging': 'https://test.staging.cms.va.gov',
+  'vagovprod'   : 'https://test.staging.cms.va.gov',
    // This is a Tugboat URL, rebuilt frequently from PROD CMS. See https://tugboat.vfs.va.gov/6042f35d6a89945fd6399dc3.
    // If there are issues with this endpoint, please post in #cms-support Slack and tag @CMS DevOps Engineers.
-   'sandbox'     : 'https://cms-vets-website-branch-builds-lo9uhqj18nwixunsjadvjsynuni7kk1u.ci.cms.va.gov',
+   'sandbox'     : 'https://test.staging.cms.va.gov',
 ]
 
 DRUPAL_CREDENTIALS = [

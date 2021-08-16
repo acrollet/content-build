@@ -190,11 +190,11 @@ function createHealthCareRegionListPages(page, drupalPagePath, files) {
 function addGetUpdatesFields(page, pages) {
   const regionPageUrlPath = page.entityUrl.breadcrumb[1]?.url?.path;
 
-  if (!regionPageUrlPath) {
-    throw new Error(
-      `CMS error while building breadcrumbs: "${page.entityUrl.path}" is missing reference to a parent or grandparent.`,
-    );
-  }
+  // if (!regionPageUrlPath) {
+  //   throw new Error(
+  //     `CMS error while building breadcrumbs: "${page.entityUrl.path}" is missing reference to a parent or grandparent.`,
+  //   );
+  // }
 
   const regionPage = pages.find(p => p.entityUrl.path === regionPageUrlPath);
 
