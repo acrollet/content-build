@@ -267,6 +267,116 @@ jobs:
           blocks: ${{ steps.get-broken-link-info.outputs.SLACK_BLOCKS }}
           channel_id: ${{ env.CHANNEL_ID}}
 
+  archive:
+    name: Archive
+    runs-on: ${{ needs.start-runner.outputs.label }}
+    needs: [set-env, build, start-runner]
+
+    env:
+      BUILDTYPE: vagovprod
+
+    steps:
+      - name: Restore vagovprod build
+        run: |
+          mkdir -p build
+          cp -R /tmp/${{ github.run_id }}/${{ env.BUILDTYPE }} build/${{ env.BUILDTYPE }}
+          du -h build/${{ env.BUILDTYPE }}
+
+      - name: Compress ${{ env.BUILDTYPE }} build
+        run: tar -jcvf ${{ env.BUILDTYPE }}.tar.bz2 build/${{ env.BUILDTYPE }}
+
+      - name: Configure AWS credentials (1)
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-gov-west-1
+
+      - name: Get role from Parameter Store
+        uses: marvinpinto/action-inject-ssm-secrets@latest
+        with:
+          ssm_parameter: /frontend-team/github-actions/parameters/AWS_FRONTEND_NONPROD_ROLE
+          env_variable_name: AWS_FRONTEND_NONPROD_ROLE
+
+      - name: Configure AWS Credentials (2)
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-gov-west-1
+          role-to-assume: ${{ env.AWS_FRONTEND_NONPROD_ROLE }}
+          role-duration-seconds: 900
+          role-session-name: vsp-frontendteam-githubaction
+
+      - name: Upload build
+        run: aws s3 cp ${{ env.BUILDTYPE }}.tar.bz2 s3://vetsgov-website-builds-s3-upload/content-build/${{needs.set-env.outputs.REF}}/${{env.BUILDTYPE}}.tar.bz2 --acl public-read --region us-gov-west-1
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [set-env, archive]
+
+    steps:
+      - name: Waiting to release 
+        run: |
+          echo "Waiting to release: https://github.com/${{github.repository}}/compare/${{needs.set-env.outputs.LATEST_TAG_VERSION}}...${{needs.set-env.outputs.REF}}"
+
+      - name: Sleep for ${{ needs.set-env.outputs.RELEASE_WAIT }} minutes
+        uses: whatnick/wait-action@master
+        with:
+          time: ${{ needs.set-env.outputs.RELEASE_WAIT }}m
+
+      - name: Get next tag version
+        id: bump-tag-version
+        uses: WyriHaximus/github-action-next-semvers@v1
+        with:
+          version: ${{ needs.set-env.outputs.LATEST_TAG_VERSION }}
+
+      - name: Echo next version
+        run: echo "${{ steps.bump-tag-version.outputs.v_patch }}"
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: [set-env, create-release]
+
+    env:
+      ENVIRONMENT: vagovdev
+      BUCKET: content.dev.va.gov
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials (1)
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-gov-west-1
+
+      - name: Get role from Parameter Store
+        uses: marvinpinto/action-inject-ssm-secrets@latest
+        with:
+          ssm_parameter: /frontend-team/github-actions/parameters/AWS_FRONTEND_NONPROD_ROLE
+          env_variable_name: AWS_FRONTEND_NONPROD_ROLE
+
+      - name: Configure AWS Credentials (2)
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-gov-west-1
+          role-to-assume: ${{ env.AWS_FRONTEND_NONPROD_ROLE }}
+          role-duration-seconds: 900
+          role-session-name: vsp-frontendteam-githubaction
+
+      # - name: Deploy
+      #   run: ./script/github-actions/deploy.sh -s $SRC -d $DEST -v
+      #   env:
+      #     SRC: s3://vetsgov-website-builds-s3-upload/content-build/${{needs.set-env.outputs.REF}}/${{env.ENVIRONMENT}}.tar.bz2
+      #     DEST: s3://${{ env.BUCKET }}
+          
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
