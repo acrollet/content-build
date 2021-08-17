@@ -605,11 +605,11 @@ jobs:
           role-duration-seconds: 900
           role-session-name: vsp-frontendteam-githubaction
 
-      # - name: Deploy
-      #   run: ./script/github-actions/deploy.sh -s $SRC -d $DEST -v
-      #   env:
-      #     SRC: s3://vetsgov-website-builds-s3-upload/content-build/temp-test/${{env.BUILDTYPE}}.tar.bz2
-      #     DEST: s3://${{ env.BUCKET }}/temp-test
+      - name: Deploy
+        run: ./script/github-actions/deploy.sh -s $SRC -d $DEST -v
+        env:
+          SRC: s3://vetsgov-website-builds-s3-upload/content-build/temp-test/${{env.BUILDTYPE}}.tar.bz2
+          DEST: s3://${{ env.BUCKET }}/temp-test
 
   stop-runner:
     name: Stop on-demand-runner
