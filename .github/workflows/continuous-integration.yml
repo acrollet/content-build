@@ -6,12 +6,6 @@ on:
       - '**'
     tags-ignore:
       - '**'
-  workflow_dispatch:
-    inputs:
-      release_wait:
-        description: "Minutes to wait before creating release"
-        required: false
-        default: 5
 
 # TODO: Change to correct channel_id when ready
 env:
@@ -97,39 +91,6 @@ jobs:
       - name: EC2 Runner ID
         id: start-ec2-runner-id
         run: echo ::set-output name=${{ matrix.buildtype }}::${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
-  set-env:
-    name: Set Env Variables
-    runs-on: ubuntu-latest
-    outputs:
-      LATEST_TAG_VERSION: ${{ steps.get-latest-tag.outputs.LATEST_TAG_VERSION }}
-      RELEASE_WAIT: ${{ env.RELEASE_WAIT }}
-      REF: ${{ steps.get-latest-release.outputs.target_commitish }}
-
-    steps:
-      # - name: Cancel workflow due to DSVA schedule
-      #   if: ${{ env.DSVA_SCHEDULE_ENABLED != 'true' }}
-      #   uses: andymckay/cancel-action@0.2
-
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-
-      - name: Get latest tag
-        id: get-latest-tag
-        run: echo ::set-output name=LATEST_TAG_VERSION::$(git fetch --all --tags > /dev/null && git tag -l | sort -V --reverse | head -n 1)
-
-      - name: Get latest release
-        id: get-latest-release
-        uses: thebritican/fetch-latest-release@v2.0.0
-
-      - name: Get release wait time (scheduled release)
-        if: ${{ github.event.schedule != '' }}
-        run: echo "RELEASE_WAIT=0" >> $GITHUB_ENV
-
-      - name: Get release wait time (workflow_dispatch)
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        run: echo "RELEASE_WAIT=${{ github.event.inputs.release_wait }}" >> $GITHUB_ENV
 
   build:
     name: Build
@@ -306,116 +267,6 @@ jobs:
           blocks: ${{ steps.get-broken-link-info.outputs.SLACK_BLOCKS }}
           channel_id: ${{ env.CHANNEL_ID}}
 
-  archive:
-    name: Archive
-    runs-on: ${{ needs.start-runner.outputs.label }}
-    needs: [set-env, build, start-runner]
-
-    env:
-      BUILDTYPE: vagovprod
-
-    steps:
-      - name: Restore vagovprod build
-        run: |
-          mkdir -p build
-          cp -R /tmp/${{ github.run_id }}/${{ env.BUILDTYPE }} build/${{ env.BUILDTYPE }}
-          du -h build/${{ env.BUILDTYPE }}
-
-      - name: Compress ${{ env.BUILDTYPE }} build
-        run: tar -jcvf ${{ env.BUILDTYPE }}.tar.bz2 build/${{ env.BUILDTYPE }}
-
-      - name: Configure AWS credentials (1)
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-gov-west-1
-
-      - name: Get role from Parameter Store
-        uses: marvinpinto/action-inject-ssm-secrets@latest
-        with:
-          ssm_parameter: /frontend-team/github-actions/parameters/AWS_FRONTEND_NONPROD_ROLE
-          env_variable_name: AWS_FRONTEND_NONPROD_ROLE
-
-      - name: Configure AWS Credentials (2)
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-gov-west-1
-          role-to-assume: ${{ env.AWS_FRONTEND_NONPROD_ROLE }}
-          role-duration-seconds: 900
-          role-session-name: vsp-frontendteam-githubaction
-
-      - name: Upload build
-        run: aws s3 cp ${{ env.BUILDTYPE }}.tar.bz2 s3://vetsgov-website-builds-s3-upload/content-build/${{needs.set-env.outputs.REF}}/${{env.BUILDTYPE}}.tar.bz2 --acl public-read --region us-gov-west-1
-
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    needs: [set-env, archive]
-
-    steps:
-      - name: Waiting to release 
-        run: |
-          echo "Waiting to release: https://github.com/${{github.repository}}/compare/${{needs.set-env.outputs.LATEST_TAG_VERSION}}...${{needs.set-env.outputs.REF}}"
-
-      - name: Sleep for ${{ needs.set-env.outputs.RELEASE_WAIT }} minutes
-        uses: whatnick/wait-action@master
-        with:
-          time: ${{ needs.set-env.outputs.RELEASE_WAIT }}m
-
-      - name: Get next tag version
-        id: bump-tag-version
-        uses: WyriHaximus/github-action-next-semvers@v1
-        with:
-          version: ${{ needs.set-env.outputs.LATEST_TAG_VERSION }}
-
-      - name: Echo next version
-        run: echo "${{ steps.bump-tag-version.outputs.v_patch }}"
-
-  deploy:
-    name: Deploy
-    runs-on: ubuntu-latest
-    needs: [set-env, create-release]
-
-    env:
-      ENVIRONMENT: vagovdev
-      BUCKET: content.dev.va.gov
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Configure AWS credentials (1)
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-gov-west-1
-
-      - name: Get role from Parameter Store
-        uses: marvinpinto/action-inject-ssm-secrets@latest
-        with:
-          ssm_parameter: /frontend-team/github-actions/parameters/AWS_FRONTEND_NONPROD_ROLE
-          env_variable_name: AWS_FRONTEND_NONPROD_ROLE
-
-      - name: Configure AWS Credentials (2)
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-gov-west-1
-          role-to-assume: ${{ env.AWS_FRONTEND_NONPROD_ROLE }}
-          role-duration-seconds: 900
-          role-session-name: vsp-frontendteam-githubaction
-
-      # - name: Deploy
-      #   run: ./script/github-actions/deploy.sh -s $SRC -d $DEST -v
-      #   env:
-      #     SRC: s3://vetsgov-website-builds-s3-upload/content-build/${{needs.set-env.outputs.REF}}/${{env.ENVIRONMENT}}.tar.bz2
-      #     DEST: s3://${{ env.BUCKET }}
-          
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -674,95 +525,95 @@ jobs:
         env:
           BUILDTYPE: vagovprod
 
-# archive:
-#   name: Archive
-#   runs-on: ubuntu-latest
-#   needs: [cypress-tests, nightwatch-tests, unit-tests, linting, security-audit, drupal-cache-test]
+  archive:
+    name: Archive
+    runs-on: ubuntu-latest
+    needs: [cypress-tests, nightwatch-tests, unit-tests, linting, security-audit, drupal-cache-test]
 
-#   strategy:
-#     fail-fast: true
-#     matrix:
-#       buildtype: [vagovdev, vagovstaging, vagovprod]
+    strategy:
+      fail-fast: true
+      matrix:
+        buildtype: [vagovdev, vagovstaging, vagovprod]
 
-#   steps:
-#     - name: Download build artifact
-#       uses: actions/download-artifact@v2
-#       with:
-#         name: ${{ matrix.buildtype }}.tar.bz2
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{ matrix.buildtype }}.tar.bz2
 
-#     - name: Configure AWS credentials (1)
-#       uses: aws-actions/configure-aws-credentials@v1
-#       with:
-#         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#         aws-region: us-gov-west-1
+      - name: Configure AWS credentials (1)
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-gov-west-1
 
-#     - name: Get role from Parameter Store
-#       uses: marvinpinto/action-inject-ssm-secrets@latest
-#       with:
-#         ssm_parameter: /frontend-team/github-actions/parameters/AWS_FRONTEND_NONPROD_ROLE
-#         env_variable_name: AWS_FRONTEND_NONPROD_ROLE
+      - name: Get role from Parameter Store
+        uses: marvinpinto/action-inject-ssm-secrets@latest
+        with:
+          ssm_parameter: /frontend-team/github-actions/parameters/AWS_FRONTEND_NONPROD_ROLE
+          env_variable_name: AWS_FRONTEND_NONPROD_ROLE
 
-#     - name: Configure AWS Credentials (2)
-#       uses: aws-actions/configure-aws-credentials@v1
-#       with:
-#         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#         aws-region: us-gov-west-1
-#         role-to-assume: ${{ env.AWS_FRONTEND_NONPROD_ROLE }}
-#         role-duration-seconds: 900
-#         role-session-name: vsp-frontendteam-githubaction
+      - name: Configure AWS Credentials (2)
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-gov-west-1
+          role-to-assume: ${{ env.AWS_FRONTEND_NONPROD_ROLE }}
+          role-duration-seconds: 900
+          role-session-name: vsp-frontendteam-githubaction
 
-#     - name: Upload build
-#       run: aws s3 cp ${{ matrix.buildtype }}.tar.bz2 s3://vetsgov-website-builds-s3-upload/content-build/$GITHUB_SHA/${{ matrix.buildtype }}.tar.bz2 --acl public-read --region us-gov-west-1
+      - name: Upload build
+        run: aws s3 cp ${{ matrix.buildtype }}.tar.bz2 s3://vetsgov-website-builds-s3-upload/content-build/$GITHUB_SHA/${{ matrix.buildtype }}.tar.bz2 --acl public-read --region us-gov-west-1
 
-# deploy:
-#   name: Deploy
-#   runs-on: ubuntu-latest
-#   if: ${{ github.ref == 'refs/heads/master' }}
-#   needs: archive
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    if: ${{ github.ref == 'refs/heads/master' }}
+    needs: archive
 
-#   strategy:
-#     matrix:
-#       environment: [vagovdev, vagovstaging]
-#       include:
-#         - environment: vagovdev
-#           bucket: content.dev.va.gov
-#         - environment: vagovstaging
-#           bucket: content.staging.va.gov
+    strategy:
+      matrix:
+        environment: [vagovdev, vagovstaging]
+        include:
+          - environment: vagovdev
+            bucket: content.dev.va.gov
+          - environment: vagovstaging
+            bucket: content.staging.va.gov
 
-#   steps:
-#     - name: Checkout
-#       uses: actions/checkout@v2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
 
-#     - name: Configure AWS credentials (1)
-#       uses: aws-actions/configure-aws-credentials@v1
-#       with:
-#         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#         aws-region: us-gov-west-1
+      - name: Configure AWS credentials (1)
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-gov-west-1
 
-#     - name: Get role from Parameter Store
-#       uses: marvinpinto/action-inject-ssm-secrets@latest
-#       with:
-#         ssm_parameter: /frontend-team/github-actions/parameters/AWS_FRONTEND_NONPROD_ROLE
-#         env_variable_name: AWS_FRONTEND_NONPROD_ROLE
+      - name: Get role from Parameter Store
+        uses: marvinpinto/action-inject-ssm-secrets@latest
+        with:
+          ssm_parameter: /frontend-team/github-actions/parameters/AWS_FRONTEND_NONPROD_ROLE
+          env_variable_name: AWS_FRONTEND_NONPROD_ROLE
 
-#     - name: Configure AWS Credentials (2)
-#       uses: aws-actions/configure-aws-credentials@v1
-#       with:
-#         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#         aws-region: us-gov-west-1
-#         role-to-assume: ${{ env.AWS_FRONTEND_NONPROD_ROLE }}
-#         role-duration-seconds: 900
-#         role-session-name: vsp-frontendteam-githubaction
+      - name: Configure AWS Credentials (2)
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-gov-west-1
+          role-to-assume: ${{ env.AWS_FRONTEND_NONPROD_ROLE }}
+          role-duration-seconds: 900
+          role-session-name: vsp-frontendteam-githubaction
 
-#     - name: Deploy
-#       run: ./script/github-actions/deploy.sh -s $SRC -d $DEST -v
-#       env:
-#         SRC: s3://vetsgov-website-builds-s3-upload/content-build/${{ github.sha }}/${{ matrix.environment }}.tar.bz2
-#         DEST: s3://${{ matrix.bucket }}
+      # - name: Deploy
+      #   run: ./script/github-actions/deploy.sh -s $SRC -d $DEST -v
+      #   env:
+      #     SRC: s3://vetsgov-website-builds-s3-upload/content-build/${{ github.sha }}/${{ matrix.environment }}.tar.bz2
+      #     DEST: s3://${{ matrix.bucket }}
 
   stop-runner:
     name: Stop on-demand-runner
