@@ -575,7 +575,6 @@ jobs:
     needs: archive
 
     env:
-      ENVIRONMENT: vagovdev
       BUCKET: content.dev.va.gov
 
     steps:
@@ -608,7 +607,7 @@ jobs:
       - name: Deploy
         run: ./script/github-actions/deploy.sh -s $SRC -d $DEST -v
         env:
-          SRC: s3://vetsgov-website-builds-s3-upload/content-build/temp-test/${{ env.ENVIRONMENT }}.tar.bz2
+          SRC: s3://vetsgov-website-builds-s3-upload/content-build/temp-test/vagovprod.tar.bz2
           DEST: s3://${{ env.BUCKET }}/temp-test
 
   stop-runner:
