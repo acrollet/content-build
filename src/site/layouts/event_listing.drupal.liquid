@@ -1,9 +1,8 @@
 {% include "src/site/includes/header.html" %}
-{% include "src/site/includes/alerts.drupal.liquid" %}
 {% include "src/site/includes/preview-edit.drupal.liquid" %}
 {% include "src/site/includes/breadcrumbs.drupal.liquid" with hideHomeBreadcrumb = true %}
 
-<div class="interior vads-u-padding-bottom--3" id="content">
+<div class="interior vads-u-padding-bottom--3" id="content" data-template="event_listing.drupal.liquid">
   <main class="va-l-detail-page va-facility-page">
     <div class="usa-grid usa-grid-full">
       {% if entityUrl.breadcrumb.1.text == "Outreach and events" %}
@@ -24,7 +23,7 @@
                 {% endif %}
               </div>
 
-              {% if pastEvents.entities.length > 0 %}
+              {% if pastEvents.entities.length > 0 or entityUrl.path contains 'past-events' %}
                 {% include "src/site/facilities/facilities_events_toggle.drupal.liquid" with url = entityUrl.path %}
               {% endif %}
 
@@ -77,7 +76,7 @@
 
               {% assign numItems = pagedItems | size %}
               {% if numItems < 1 %}
-                <div class="clearfix-text">No events at this time.</div>
+                <div id="no-events-message" class="clearfix-text">No events at this time.</div>
               {% endif %}
 
               {% include "src/site/includes/pagination.drupal.liquid" %}

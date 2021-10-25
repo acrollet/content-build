@@ -48,18 +48,21 @@ function createPastEventListPages(page, drupalPagePath, files) {
     ['desc'],
   );
 
-  // Past Events listing page
-  const pastEventsEntityUrl = createEntityUrlObj(drupalPagePath);
+  // Derive the path + breadcrumbs for past events.
+  const pastEventsEntityURL = createEntityUrlObj(drupalPagePath);
 
+  // Derive the data that the event_listing template receives.
   const pastEventsObj = {
-    allEventTeasers: pastEventTeasers,
-    eventTeasers: pastEventTeasers,
-    fieldIntroText: page.fieldIntroText,
-    facilitySidebar: sidebar,
-    entityUrl: pastEventsEntityUrl,
-    title: page.title,
     alert: page.alert,
+    allEventTeasers: pastEventTeasers,
+    entityUrl: pastEventsEntityURL,
+    eventTeasers: pastEventTeasers,
+    facilitySidebar: sidebar,
+    fieldIntroText: page.fieldIntroText,
+    outreachSidebar: page.outreachSidebar,
+    title: page.title,
   };
+
   const pastEventsPage = updateEntityUrlObj(
     pastEventsObj,
     drupalPagePath,
@@ -104,28 +107,6 @@ function createHealthCareRegionListPages(page, drupalPagePath, files) {
   files[`${drupalPagePath}/status/index.html`] = createFileObj(
     statusPage,
     'health_care_facility_status.drupal.liquid',
-  );
-
-  // Create the top-level locations page for Health Care Regions
-  const locEntityUrl = createEntityUrlObj(drupalPagePath);
-  const locObj = {
-    mainFacilities: page.mainFacilities,
-    otherFacilities: page.otherFacilities,
-    mobileFacilities: page.mobileFacilities,
-    fieldOtherVaLocations: page.fieldOtherVaLocations,
-    facilitySidebar: sidebar,
-    entityUrl: locEntityUrl,
-    alert: page.alert,
-    title: page.title,
-  };
-  const locPage = updateEntityUrlObj(locObj, drupalPagePath, 'Locations');
-  const locPath = locPage.entityUrl.path;
-  locPage.regionOrOffice = page.title;
-  locPage.entityUrl = generateBreadCrumbs(locPath);
-
-  files[`${drupalPagePath}/locations/index.html`] = createFileObj(
-    locPage,
-    'health_care_region_locations_page.drupal.liquid',
   );
 
   // Press Release listing page

@@ -37,12 +37,14 @@ function createUniqueId(headingEl, headingOptions) {
 module.exports = {
   modifyFile(fileName, file) {
     let idAdded = false;
+    let hasTOCLinks = false;
 
     if (fileName.endsWith('html')) {
       const { dom } = file;
-      const tableOfContents = dom('#table-of-contents ul');
+      const tableOfContents = dom('#table-of-contents');
+      const tableOfContentsList = dom('#table-of-contents ul');
 
-      if (!tableOfContents) {
+      if (!tableOfContentsList) {
         return;
       }
 
@@ -58,7 +60,10 @@ module.exports = {
 
       if (entityBundlesForResourcesAndSupport.has(file.entityBundle)) {
         nodes = dom('article h2');
+
         if (nodes.length < 2) {
+          tableOfContents.remove();
+          file.modified = true;
           return;
         }
       } else {
@@ -70,9 +75,11 @@ module.exports = {
         const parent = heading.parents();
         const isInAccordionButton = parent.hasClass('usa-accordion-button');
         const isInAccordion = parent.hasClass('usa-accordion-content');
+        const isInAlert = parent.hasClass('usa-alert-body');
 
-        // skip heading if it already has an id and skip heading if it's in an accordion button
-        if (!heading.attr('id') && !isInAccordionButton) {
+        // skip heading if it already has an id
+        // skip heading if it's in an accordion button or an alert
+        if (!heading.attr('id') && !isInAccordionButton && !isInAlert) {
           const headingID = createUniqueId(heading, headingOptions);
           heading.attr('id', headingID);
           idAdded = true;
@@ -81,13 +88,14 @@ module.exports = {
         // if it is an h2, add the h2 to the table of contents
         if (
           el.tagName.toLowerCase() === 'h2' &&
-          tableOfContents &&
+          tableOfContentsList &&
           heading.attr('id') &&
           heading.text().toLowerCase() !== 'on this page' &&
           !isInAccordionButton &&
-          !isInAccordion
+          !isInAccordion &&
+          !isInAlert
         ) {
-          tableOfContents.append(
+          tableOfContentsList.append(
             `<li class="vads-u-margin-bottom--2"><a href="#${heading.attr(
               'id',
             )}" onClick="recordEvent({ event: 'nav-jumplink-click', heading: '${heading.attr(
@@ -98,8 +106,15 @@ module.exports = {
               </i>${heading.text()}</a></li>`,
           );
           idAdded = true;
+          hasTOCLinks = true;
         }
       });
+
+      if (tableOfContents && !hasTOCLinks) {
+        tableOfContents.remove();
+        file.modified = true;
+        return;
+      }
 
       if (idAdded) {
         file.modified = true;

@@ -14,6 +14,7 @@ const personProfileFragment = `
   fieldDescription
   fieldEmailAddress
   fieldPhoneNumber
+  fieldCompleteBiographyCreate
   fieldCompleteBiography { entity { url } }
   fieldOffice {
       entity {
@@ -28,12 +29,25 @@ const personProfileFragment = `
   fieldIntroText
   fieldPhotoAllowHiresDownload
   fieldMedia {
-    entity {
+    thumbnail: entity {
       ... on MediaImage {
         image {
           alt
           title
           derivative(style: _23MEDIUMTHUMBNAIL) {
+            url
+            width
+            height
+          }
+        }
+      }
+    }
+    hiRes: entity {
+      ... on MediaImage {
+        image {
+          alt
+          title
+          derivative(style: ORIGINAL) {
             url
             width
             height
